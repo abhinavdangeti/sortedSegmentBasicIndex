@@ -61,14 +61,14 @@ func (s *SegmentKindBasicIndex) Add(keyIdx int, key []byte) bool {
 		return false
 	}
 
-	if keyIdx%(s.hop+1) != 0 {
-		// Key does not satisfy the hop condition.
-		return true
-	}
-
 	if len(key) > (len(s.data) - s.numKeyBytes) {
 		// No room for any more keys
 		return false
+	}
+
+	if keyIdx%(s.hop+1) != 0 {
+		// Key does not satisfy the hop condition.
+		return true
 	}
 
 	s.offsets = append(s.offsets, uint32(s.numKeyBytes))

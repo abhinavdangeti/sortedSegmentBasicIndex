@@ -45,16 +45,16 @@ func NewSegmentKindBasicIndex(quota int, keyCount int,
 
 	return &SegmentKindBasicIndex{
 		numIndexableKeys: indexKeyCount,
-		numKeyBytes: 0,
-		data: data,
-		offsets: []uint32{},
-		hop: hop,
+		numKeyBytes:      0,
+		data:             data,
+		offsets:          []uint32{},
+		hop:              hop,
 	}
 }
 
 // Returns true if space still available, false otherwise
 func (s *SegmentKindBasicIndex) Add(keyIdx int, key []byte) bool {
-	if keyIdx % (s.hop + 1) != 0 {
+	if keyIdx%(s.hop+1) != 0 {
 		// Key does not satisfy the hop condition.
 		if len(s.offsets) >= s.numIndexableKeys {
 			// All keys that can be indexed already have been,
@@ -114,7 +114,7 @@ func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
 	keyEnd = uint32(s.numKeyBytes)
 	cmp = bytes.Compare(s.data[keyStart:keyEnd], key)
 	if cmp < 0 {
-		leftPos = (len(s.offsets) - 1) * (s.hop + 1)
+		leftPos = (len(s.offsets) - 1) * (s.hop + 1) // TODO: * 2
 		rightPos = -1
 		return
 	}
@@ -123,13 +123,17 @@ func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
 		h := i + (j-i)/2
 
 		keyStart = s.offsets[h]
-		keyEnd = s.offsets[h+1]
+		if h < len(s.offsets)-1 {
+			keyEnd = s.offsets[h+1]
+		} else {
+			keyEnd = uint32(s.numKeyBytes)
+		}
 
 		cmp = bytes.Compare(s.data[keyStart:keyEnd], key)
 		if cmp == 0 {
 			// Direct hit
 			found = true
-			leftPos = h * (s.hop + 1)
+			leftPos = h * (s.hop + 1) // TODO: * 2
 			return
 		} else if cmp < 0 {
 			if i == h {
@@ -144,8 +148,8 @@ func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
 		}
 	}
 
-	leftPos = i * (s.hop + 1)
-	rightPos = j * (s.hop + 1)
+	leftPos = i * (s.hop + 1)  // TODO: * 2
+	rightPos = j * (s.hop + 1) // TODO: * 2
 
 	return
 }

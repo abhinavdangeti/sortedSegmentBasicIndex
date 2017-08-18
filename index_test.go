@@ -43,7 +43,15 @@ func TestBasic(t *testing.T) {
 	)
 
 	for i, k := range keys {
-		s.Add(i, []byte(k))
+		ret := s.Add(i, []byte(k))
+		if !ret {
+			t.Errorf("Unexpected Add failure!")
+		}
+	}
+
+	ret := s.Add(0, []byte("key"))
+	if ret {
+		t.Errorf("Space shouldn't have been available!")
 	}
 
 	if s.numIndexableKeys != 3 {

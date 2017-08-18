@@ -54,14 +54,15 @@ func NewSegmentKindBasicIndex(quota int, keyCount int,
 
 // Returns true if space still available, false otherwise
 func (s *SegmentKindBasicIndex) Add(keyIdx int, key []byte) bool {
+	if len(s.offsets) >= s.numIndexableKeys {
+		// All keys that can be indexed already have been,
+		// return false indicating that there's no room for
+		// anymore.
+		return false
+	}
+
 	if keyIdx%(s.hop+1) != 0 {
 		// Key does not satisfy the hop condition.
-		if len(s.offsets) >= s.numIndexableKeys {
-			// All keys that can be indexed already have been,
-			// return false indicating that there's no room for
-			// anymore.
-			return false
-		}
 		return true
 	}
 
@@ -73,12 +74,6 @@ func (s *SegmentKindBasicIndex) Add(keyIdx int, key []byte) bool {
 	s.offsets = append(s.offsets, uint32(s.numKeyBytes))
 	copy(s.data[s.numKeyBytes:], key[:])
 	s.numKeyBytes += len(key)
-
-	if len(s.offsets) == s.numIndexableKeys {
-		// All keys that are to be indexed have already been
-		// indexed.
-		return false
-	}
 
 	return true
 }

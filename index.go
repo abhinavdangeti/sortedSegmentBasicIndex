@@ -1,26 +1,15 @@
-//  Copyright (c) 2017 Couchbase, Inc.
-//
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-//  Unless required by applicable law or agreed to in writing,
-//  software distributed under the License is distributed on an "AS
-//  IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
-//  express or implied. See the License for the specific language
-//  governing permissions and limitations under the License.
-
 package main
 
 import (
 	"bytes"
 )
 
-type SegmentKindBasicIndex struct {
+type segmentKindBasicIndex struct {
 	// Number of keys that can be indexed
 	numIndexableKeys int
+
+	// Keys that have been added so far
+	numKeys int
 
 	// Size in bytes of all the indexed keys
 	numKeyBytes int
@@ -35,26 +24,28 @@ type SegmentKindBasicIndex struct {
 	hop int
 }
 
-func NewSegmentKindBasicIndex(quota int, keyCount int,
-	keyAvgSize int) *SegmentKindBasicIndex {
+func newSegmentKindBasicIndex(quota int, keyCount int,
+	keyAvgSize int) *segmentKindBasicIndex {
 
 	indexKeyCount := quota / (keyAvgSize + 4 /* 4 for the offset */)
 	hop := keyCount / indexKeyCount
 
 	data := make([]byte, indexKeyCount*keyAvgSize)
+	offsets := make([]uint32, indexKeyCount)
 
-	return &SegmentKindBasicIndex{
+	return &segmentKindBasicIndex{
 		numIndexableKeys: indexKeyCount,
+		numKeys:          0,
 		numKeyBytes:      0,
 		data:             data,
-		offsets:          []uint32{},
+		offsets:          offsets,
 		hop:              hop,
 	}
 }
 
 // Returns true if space still available, false otherwise
-func (s *SegmentKindBasicIndex) Add(keyIdx int, key []byte) bool {
-	if len(s.offsets) >= s.numIndexableKeys {
+func (s *segmentKindBasicIndex) Add(keyIdx int, key []byte) bool {
+	if s.numKeys >= s.numIndexableKeys {
 		// All keys that can be indexed already have been,
 		// return false indicating that there's no room for
 		// anymore.
@@ -71,14 +62,24 @@ func (s *SegmentKindBasicIndex) Add(keyIdx int, key []byte) bool {
 		return true
 	}
 
-	s.offsets = append(s.offsets, uint32(s.numKeyBytes))
+	s.offsets[s.numKeys] = uint32(s.numKeyBytes)
 	copy(s.data[s.numKeyBytes:], key[:])
+	s.numKeys++
 	s.numKeyBytes += len(key)
 
 	return true
 }
 
-func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
+// Fetches the range of offsets between which the key exists,
+// if present at all.
+// - If in case of direct hit: found: true, leftPos: position
+// - If key is before the first entry: ENOENT, leftPos = rightPos = 0
+// - rightPos will need to be updated to the segment length in the
+//   following cases:
+//     * If index doesn't contain any keys: rightPos = -1
+//     * If key lies after the last key in the index: rightPos = -1
+// - In all other cases: found: false, valid leftPos & rightPos
+func (s *segmentKindBasicIndex) Lookup(key []byte) (found bool,
 	leftPos int, rightPos int) {
 
 	// Get the starting offsets of the first and last key
@@ -105,11 +106,11 @@ func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
 	}
 
 	// If key larger than last key, return early.
-	keyStart = s.offsets[len(s.offsets)-1]
+	keyStart = s.offsets[s.numKeys-1]
 	keyEnd = uint32(s.numKeyBytes)
 	cmp = bytes.Compare(s.data[keyStart:keyEnd], key)
 	if cmp < 0 {
-		leftPos = (len(s.offsets) - 1) * (s.hop + 1) // TODO: * 2
+		leftPos = (s.numKeys - 1) * (s.hop + 1)
 		rightPos = -1
 		return
 	}
@@ -118,7 +119,7 @@ func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
 		h := i + (j-i)/2
 
 		keyStart = s.offsets[h]
-		if h < len(s.offsets)-1 {
+		if h < s.numKeys-1 {
 			keyEnd = s.offsets[h+1]
 		} else {
 			keyEnd = uint32(s.numKeyBytes)
@@ -128,7 +129,7 @@ func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
 		if cmp == 0 {
 			// Direct hit
 			found = true
-			leftPos = h * (s.hop + 1) // TODO: * 2
+			leftPos = h * (s.hop + 1)
 			return
 		} else if cmp < 0 {
 			if i == h {
@@ -143,8 +144,8 @@ func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
 		}
 	}
 
-	leftPos = i * (s.hop + 1)  // TODO: * 2
-	rightPos = j * (s.hop + 1) // TODO: * 2
+	leftPos = i * (s.hop + 1)
+	rightPos = j * (s.hop + 1)
 
 	return
 }

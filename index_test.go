@@ -1,17 +1,3 @@
-//  Copyright (c) 2017 Couchbase, Inc.
-//
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-//  Unless required by applicable law or agreed to in writing,
-//  software distributed under the License is distributed on an "AS
-//  IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
-//  express or implied. See the License for the specific language
-//  governing permissions and limitations under the License.
-
 package main
 
 import (
@@ -19,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestBasic(t *testing.T) {
+func TestSegmentKindBasicIndex(t *testing.T) {
 	// Consider a moss segment with this data:
 	// Buf: |key1|val1|key10|val10|key100|val100|key1000|val1000
 	//      |key250|val250|key4000|val4000|key500|val500
@@ -36,7 +22,7 @@ func TestBasic(t *testing.T) {
 		"key500",
 	}
 
-	s := NewSegmentKindBasicIndex(
+	s := newSegmentKindBasicIndex(
 		30, // quota
 		7,  // number of keys
 		6,  // average key size
@@ -73,17 +59,20 @@ func TestBasic(t *testing.T) {
 		t.Errorf("Unexpected hop: %v!", s.hop)
 	}
 
-	found, left, right := s.Lookup([]byte("key1000"))
+	var found bool
+	var left, right int
+
+	found, left, _ = s.Lookup([]byte("key1000"))
 	if !found || left != 3 {
 		t.Errorf("Unexpected results for key1000")
 	}
 
-	found, left, right = s.Lookup([]byte("key1"))
+	found, left, _ = s.Lookup([]byte("key1"))
 	if !found || left != 0 {
 		t.Errorf("Unexpected results for key1")
 	}
 
-	found, left, right = s.Lookup([]byte("key500"))
+	found, left, _ = s.Lookup([]byte("key500"))
 	if !found || left != 6 {
 		t.Errorf("Unexpected results for key500")
 	}

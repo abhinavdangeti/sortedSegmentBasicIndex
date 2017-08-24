@@ -82,9 +82,7 @@ func (s *segmentKindBasicIndex) Add(keyIdx int, key []byte) bool {
 func (s *segmentKindBasicIndex) Lookup(key []byte) (found bool,
 	leftPos int, rightPos int) {
 
-	// Get the starting offsets of the first and last key
-	// in the data array
-	i, j := 0, len(s.offsets)
+	i, j := 0, s.numKeys
 
 	found = false
 	leftPos = 0

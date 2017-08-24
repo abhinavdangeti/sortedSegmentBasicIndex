@@ -50,7 +50,7 @@ func TestSegmentKindBasicIndex(t *testing.T) {
 		t.Errorf("Unexpected data in index array: %v", string(s.data))
 	}
 
-	if len(s.offsets) != 3 ||
+	if s.numKeys != 3 ||
 		s.offsets[0] != 0 || s.offsets[1] != 4 || s.offsets[2] != 11 {
 		t.Errorf("Unexpected content in offsets array!")
 	}

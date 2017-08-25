@@ -22,7 +22,7 @@ func TestSegmentKindBasicIndex(t *testing.T) {
 		"key500",
 	}
 
-	s := newSegmentKindBasicIndex(
+	s := NewSegmentKindBasicIndex(
 		30, // quota
 		7,  // number of keys
 		6,  // average key size

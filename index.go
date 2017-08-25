@@ -24,7 +24,7 @@ type segmentKindBasicIndex struct {
 	hop int
 }
 
-func newSegmentKindBasicIndex(quota int, keyCount int,
+func NewSegmentKindBasicIndex(quota int, keyCount int,
 	keyAvgSize int) *segmentKindBasicIndex {
 
 	indexKeyCount := quota / (keyAvgSize + 4 /* 4 for the offset */)

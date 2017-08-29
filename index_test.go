@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestSegmentKindBasicIndex(t *testing.T) {
+func TestSegmentKeysIndex(t *testing.T) {
 	// Consider a moss segment with this data:
 	// Buf: |key1|val1|key10|val10|key100|val100|key1000|val1000
 	//      |key250|val250|key4000|val4000|key500|val500
@@ -22,7 +22,7 @@ func TestSegmentKindBasicIndex(t *testing.T) {
 		"key500",
 	}
 
-	s := NewSegmentKindBasicIndex(
+	s := NewSegmentKeysIndex(
 		30, // quota
 		7,  // number of keys
 		6,  // average key size
@@ -59,41 +59,40 @@ func TestSegmentKindBasicIndex(t *testing.T) {
 		t.Errorf("Unexpected hop: %v!", s.hop)
 	}
 
-	var found bool
 	var left, right int
 
-	found, left, _ = s.Lookup([]byte("key1000"))
-	if !found || left != 3 {
+	left, right = s.Lookup([]byte("key1000"))
+	if left != 3 || right != 4 {
 		t.Errorf("Unexpected results for key1000")
 	}
 
-	found, left, _ = s.Lookup([]byte("key1"))
-	if !found || left != 0 {
+	left, right = s.Lookup([]byte("key1"))
+	if left != 0 || right != 1 {
 		t.Errorf("Unexpected results for key1")
 	}
 
-	found, left, _ = s.Lookup([]byte("key500"))
-	if !found || left != 6 {
+	left, right = s.Lookup([]byte("key500"))
+	if left != 6 || right != 7 {
 		t.Errorf("Unexpected results for key500")
 	}
 
-	found, left, right = s.Lookup([]byte("key400"))
-	if found || left != 3 || right != 6 {
+	left, right = s.Lookup([]byte("key400"))
+	if left != 3 || right != 6 {
 		t.Errorf("Unexpected results for key4000")
 	}
 
-	found, left, right = s.Lookup([]byte("key100"))
-	if found || left != 0 || right != 3 {
+	left, right = s.Lookup([]byte("key100"))
+	if left != 0 || right != 3 {
 		t.Errorf("Unexpected results for key100")
 	}
 
-	found, left, right = s.Lookup([]byte("key0"))
-	if found || left != 0 || right != 0 {
+	left, right = s.Lookup([]byte("key0"))
+	if left != 0 || right != 0 {
 		t.Errorf("Unexpected results for key0")
 	}
 
-	found, left, right = s.Lookup([]byte("key6"))
-	if found || left != 6 || right != -1 {
+	left, right = s.Lookup([]byte("key6"))
+	if left != 6 || right != 7 {
 		t.Errorf("Unexpected results for key6")
 	}
 }

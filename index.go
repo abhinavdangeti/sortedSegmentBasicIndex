@@ -4,9 +4,9 @@ import (
 	"bytes"
 )
 
-// SegmentKindBasicIndex is a minimal in-memory index (typically for a
+// SegmentKeysIndex is a minimal in-memory index (typically for a
 // moss segment).
-type SegmentKindBasicIndex struct {
+type SegmentKeysIndex struct {
 	// Number of keys that can be indexed
 	numIndexableKeys int
 
@@ -24,32 +24,36 @@ type SegmentKindBasicIndex struct {
 
 	// Number of keys skipped in between 2 adjacent keys in the data array
 	hop int
+
+	// Total number of keys in the source segment
+	srcKeyCount int
 }
 
-// NewSegmentKindBasicIndex creates a segmentKindBasicIndex per
+// NewSegmentKeysIndex creates a segmentKindBasicIndex per
 // the specifications, and returns it to the caller.
-func NewSegmentKindBasicIndex(quota int, keyCount int,
-	keyAvgSize int) *SegmentKindBasicIndex {
+func NewSegmentKeysIndex(quota int, keyCount int,
+	keyAvgSize int) *SegmentKeysIndex {
 
-	indexKeyCount := quota / (keyAvgSize + 4 /* 4 for the offset */)
-	hop := keyCount / indexKeyCount
+	numIndexableKeys := quota / (keyAvgSize + 4 /* 4 for the offset */)
+	hop := keyCount / numIndexableKeys
 
-	data := make([]byte, indexKeyCount*keyAvgSize)
-	offsets := make([]uint32, indexKeyCount)
+	data := make([]byte, numIndexableKeys*keyAvgSize)
+	offsets := make([]uint32, numIndexableKeys)
 
-	return &SegmentKindBasicIndex{
-		numIndexableKeys: indexKeyCount,
+	return &SegmentKeysIndex{
+		numIndexableKeys: numIndexableKeys,
 		numKeys:          0,
 		numKeyBytes:      0,
 		data:             data,
 		offsets:          offsets,
 		hop:              hop,
+		srcKeyCount:      keyCount,
 	}
 }
 
 // Add adds a qualified entry to the index. Returns true if space
 // still available, false otherwise.
-func (s *SegmentKindBasicIndex) Add(keyIdx int, key []byte) bool {
+func (s *SegmentKeysIndex) Add(keyIdx int, key []byte) bool {
 	if s.numKeys >= s.numIndexableKeys {
 		// All keys that can be indexed already have been,
 		// return false indicating that there's no room for
@@ -75,27 +79,19 @@ func (s *SegmentKindBasicIndex) Add(keyIdx int, key []byte) bool {
 	return true
 }
 
-// Lookup fetches the range of offsets between which the key exists,
-// if present at all.
-// - If in case of direct hit: found: true, leftPos: position
-// - If key is before the first entry: ENOENT, leftPos = rightPos = 0
-// - rightPos will need to be updated to the segment length in the
-//   following cases:
-//     * If index doesn't contain any keys: rightPos = -1
-//     * If key lies after the last key in the index: rightPos = -1
-// - In all other cases: found: false, valid leftPos & rightPos
-func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
-	leftPos int, rightPos int) {
-
+// Lookup fetches the range of offsets between which the key
+// exists, if present at all. The returned leftPos and rightPos
+// can directly be used as the left and right extreme cursors
+// while binary searching over the source segment.
+func (s *SegmentKeysIndex) Lookup(key []byte) (leftPos int, rightPos int) {
 	i, j := 0, s.numKeys
 
-	found = false
 	leftPos = 0
 	rightPos = 0
 
 	if i == j {
-		// The index wasn't used
-		rightPos = -1
+		// The index wasn't used.
+		rightPos = s.srcKeyCount
 		return
 	}
 
@@ -104,7 +100,7 @@ func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
 	keyEnd := s.offsets[1]
 	cmp := bytes.Compare(key, s.data[keyStart:keyEnd])
 	if cmp < 0 {
-		// ENOENT
+		// ENOENT.
 		return
 	}
 
@@ -114,7 +110,7 @@ func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
 	cmp = bytes.Compare(s.data[keyStart:keyEnd], key)
 	if cmp < 0 {
 		leftPos = (s.numKeys - 1) * (s.hop + 1)
-		rightPos = -1
+		rightPos = s.srcKeyCount
 		return
 	}
 
@@ -130,9 +126,9 @@ func (s *SegmentKindBasicIndex) Lookup(key []byte) (found bool,
 
 		cmp = bytes.Compare(s.data[keyStart:keyEnd], key)
 		if cmp == 0 {
-			// Direct hit
-			found = true
+			// Direct hit.
 			leftPos = h * (s.hop + 1)
+			rightPos = leftPos + 1
 			return
 		} else if cmp < 0 {
 			if i == h {
